@@ -2,39 +2,53 @@ require("dotenv").config();
 const axios = require("axios");
 const express = require("express");
 
+const { PutObjectCommand, S3Client } = require("@aws-sdk/client-s3");
+
 const cors = require("cors");
 const multer = require("multer");
 
 const app = express();
 const PORT = process.env.PORT || 2500;
 
-app.use(express.static("uploads"));
+// app.use(express.static("uploads"));
 app.use(cors({ origin: "*" }));
 
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, __dirname + "/uploads");
+const bucketName = process.env.BUCKET_NAME;
+const accessKeyId = process.env.ACCESS_KEY;
+const secretAccessKey = process.env.SECRET_ACCESS_KEY;
+const region = process.env.BUCKET_REGION;
+
+const storage = multer.memoryStorage();
+const upload = multer({ storage: storage });
+
+const s3 = new S3Client({
+  credentials: {
+    accessKeyId: accessKeyId,
+    secretAccessKey: secretAccessKey,
   },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    const splt = file.originalname.split(".");
-    const suffix = splt[splt.length - 1];
-    cb(null, file.fieldname + uniqueSuffix + "." + suffix);
-  },
+  region: region,
 });
 
-const upload = multer({
-  storage: storage,
-});
-
+// Handle file upload endpoint
 app.post("/uploads", upload.single("image"), async (req, res, next) => {
   try {
-    const imageUrl = `http://localhost:5000/uploads/${req.file.filename}`;
+    console.log("req.file", req.file);
 
-    const url = `http://localhost:5000/${req.file.filename}`;
-    res.send(url);
+    const params = {
+      Bucket: bucketName,
+      Key: req.file.originalname,
+      Body: req.file.buffer,
+      ContentType: req.file.mimetype,
+    };
+
+    const command = new PutObjectCommand(params);
+
+    await s3.send(command);
+
+    res.send({});
   } catch (error) {
     console.error(error);
+    res.status(500).send("Error uploading file");
   }
 });
 
