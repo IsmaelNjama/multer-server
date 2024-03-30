@@ -32,8 +32,6 @@ const s3 = new S3Client({
 // Handle file upload endpoint
 app.post("/uploads", upload.single("image"), async (req, res, next) => {
   try {
-    console.log("req.file", req.file);
-
     const params = {
       Bucket: bucketName,
       Key: req.file.originalname,
@@ -45,7 +43,9 @@ app.post("/uploads", upload.single("image"), async (req, res, next) => {
 
     await s3.send(command);
 
-    res.send({});
+    const imageURL = `https://${bucketName}.s3.${region}.amazonaws.com/${req.file.originalname}`;
+
+    res.send({ imageURL });
   } catch (error) {
     console.error(error);
     res.status(500).send("Error uploading file");
